@@ -1,0 +1,53 @@
+{
+  "name": "@ceasarxuu/dsh-terminal",
+  "version": "0.1.0",
+  "description": "Standalone terminal tabs and tmux attachments for DeepSeek Harness Desktop",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ceasarXuu/dsh-terminal.git"
+  },
+  "engines": {
+    "node": ">=24",
+    "dsh": ">=0.2.2-rc.5 <0.3.0-0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "host",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "licenses"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "prepack": "npm run build",
+    "check:desktop": "node scripts/check-desktop.mjs"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/headless": "6.0.0"
+  },
+  "devDependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "esbuild": "0.25.12"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}
