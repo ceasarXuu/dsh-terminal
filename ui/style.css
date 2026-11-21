@@ -92,6 +92,7 @@
 .dsh-terminal-tab[data-active="true"] { background: var(--terminal-hover); border-color: #7198ca; }
 .dsh-terminal-tab button { border: 0; }
 .dsh-terminal-tab [role="tab"] { flex: 1; min-width: 0; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dsh-terminal-tab [role="tab"][draggable="true"] { cursor: grab; }
 .dsh-terminal-tab .dsh-terminal-close { padding-inline: 6px; }
 
 .dsh-terminal-content, .dsh-terminal-empty {
@@ -121,3 +122,15 @@
 .dsh-terminal-status, .dsh-terminal-alert, .dsh-terminal-notice { font-size: 12px; }
 .dsh-terminal-status, .dsh-terminal-alert { padding-right: 8px; }
 .dsh-terminal-alert { color: #ffb3ae; }
+
+.dsh-terminal-canvas { position: absolute; inset: 0; }
+.dsh-terminal-drop-preview {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid #8cbcff;
+  border-radius: 5px;
+  background: rgba(65, 117, 197, .35);
+  pointer-events: none;
+}
+.dsh-terminal-reattach { position: absolute; z-index: 1; right: 12px; top: 6px; }

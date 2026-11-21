@@ -83,6 +83,10 @@ export function terminalRoute(connection, runtime, logger) {
       }
       const path = new URL(req.url, 'http://localhost').pathname.slice(BASE.length)
       const get = req.method === 'GET'
+      if (get && path === '/canvas') return reply(res, 200, runtime.canvas.snapshot)
+      if (req.method === 'POST' && path.startsWith('/canvas/')) {
+        return reply(res, 200, await runtime.canvas.action(path.slice('/canvas/'.length), await readBody(req)))
+      }
       if (get && path === '/sessions') return reply(res, 200, runtime.list())
       if (get && path === '/events') return runtime.follow(createFeed(res))
       if (get && path === '/tmux') return reply(res, 200, await runtime.tmux())

@@ -59,6 +59,61 @@ const output = (id, predicate) => stream(`/sessions/${id}/events`, predicate)
 const send = (id, data) => request(`/sessions/${id}/input`, 'POST', { data })
 const close = id => request(`/sessions/${id}`, 'DELETE')
 
+async function checkCanvas() {
+  const canvas = () => request('/canvas')
+  const action = (method, body = {}) => request(`/canvas/${method}`, 'POST', body)
+  const owned = new Set()
+  const open = async () => {
+    const { windowId } = await action('new')
+    owned.add(windowId)
+    return windowId
+  }
+  assert.equal((await canvas()).available, true, 'The installed tmux must provide the canvas')
+  try {
+    const first = await open()
+    const second = await open()
+    const canvasId = (await canvas()).streamId
+    await request(`/sessions/${canvasId}/size`, 'POST', { cols: 180, rows: 80 })
+    const marker = output(canvasId, frame => frame.type === 'output' && frame.data.includes('native-pane-kept'))
+    await marker.ready
+    await send(canvasId, "export DSH_CANVAS_MARK=native; printf '%s%s\\n' \"$DSH_CANVAS_MARK\" '-pane-kept'\r")
+    await marker.done
+
+    await action('select', { windowId: first })
+    const target = (await canvas()).panes[0]
+    await action('join', { source: second, target: target.id, side: 'right' })
+    let updated = await canvas()
+    assert.equal(updated.windows.find(window => window.id === first).panes, 2)
+    assert.ok(!updated.windows.some(window => window.id === second))
+    assert.ok(updated.panes.some(pane => pane.left > target.left))
+    assert.match((await output(canvasId, frame => frame.type === 'snapshot').done).screen, /native-pane-kept/)
+
+    const detached = await action('break')
+    owned.add(detached.windowId)
+    assert.equal((await canvas()).windows.find(window => window.id === first).panes, 1)
+    await action('select', { windowId: detached.windowId })
+    const sameShell = output(canvasId, frame => frame.type === 'output' && frame.data.includes('native-reattached'))
+    await sameShell.ready
+    await send(canvasId, "printf '%s%s\\n' \"$DSH_CANVAS_MARK\" '-reattached'\r")
+    await sameShell.done
+
+    await action('select', { windowId: first })
+    for (let count = 2; count <= 12; count += 1) {
+      const source = count === 2 ? detached.windowId : await open()
+      await action('select', { windowId: first })
+      const largest = (await canvas()).panes.sort((a, b) => b.width * b.height - a.width * a.height)[0]
+      await action('join', { source, target: largest.id, side: largest.width >= largest.height ? 'right' : 'bottom' })
+    }
+    updated = await canvas()
+    assert.equal(updated.windows.find(window => window.id === first).panes, 12)
+    console.log('Native tmux canvas: moved live panes, preserved shell state, broke out a pane, and reached 12 panes')
+  } finally {
+    for (const windowId of owned) await action('close', { windowId }).catch(() => {})
+  }
+}
+
+if (process.env.DSH_TERMINAL_CHECK_CANVAS === '1') await checkCanvas()
+
 try {
   const denied = await fetch(`${base}/sessions`, {
     method: 'POST', headers: { cookie, 'Content-Type': 'application/json', Origin: 'https://example.invalid' }, body: '{}',

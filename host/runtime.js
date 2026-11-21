@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { basename } from 'node:path'
 import { TerminalError, TerminalSession } from './session.js'
 import { findTmux, listTmux } from './tmux.js'
+import { TmuxCanvas } from './tmux-canvas.js'
 
 const MAX_SESSIONS = 16
 const COLS = 80
@@ -14,8 +15,9 @@ export class TerminalRuntime {
   #followers = new Set()
   #lifetime = new AbortController()
 
-  constructor(subprocess) {
+  constructor(subprocess, profileDir, logger) {
     this.subprocess = subprocess
+    this.canvas = new TmuxCanvas(subprocess, profileDir, this.#lifetime.signal, () => this.#publish(), logger)
   }
 
   list() {
@@ -23,20 +25,20 @@ export class TerminalRuntime {
   }
 
   get(id) {
-    const session = this.#sessions.get(id)
+    const session = this.#find(id)
     if (!session) throw new TerminalError(404, 'This terminal was closed or is unavailable.')
     return session
   }
 
   follow(feed) {
-    feed.send({ type: 'sessions', sessions: this.list() })
+    feed.send(this.#catalog())
     if (feed.closed) return
     this.#followers.add(feed)
     feed.onClose(() => this.#followers.delete(feed))
   }
 
   resize(id, cols, rows) {
-    return this.#sessions.get(id)?.resize(cols, rows) ?? false
+    return this.#find(id)?.resize(cols, rows) ?? false
   }
 
   async tmux() {
@@ -74,7 +76,7 @@ export class TerminalRuntime {
     this.#lifetime.abort()
     for (const feed of this.#followers) feed.close()
     await Promise.allSettled(this.#allocations.values())
-    const closed = await Promise.allSettled([...this.#sessions.keys()].map(id => this.close(id)))
+    const closed = await Promise.allSettled([this.canvas.dispose(), ...[...this.#sessions.keys()].map(id => this.close(id))])
     const failures = closed.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
     if (failures.length) throw new AggregateError(failures, 'Unable to finish closing terminal processes')
   }
@@ -114,7 +116,16 @@ export class TerminalRuntime {
   }
 
   #publish() {
-    const frame = { type: 'sessions', sessions: this.list() }
+    const frame = this.#catalog()
     for (const feed of this.#followers) feed.send(frame)
+  }
+
+  #catalog() {
+    return { type: 'sessions', sessions: this.list(), canvas: this.canvas.snapshot }
+  }
+
+  #find(id) {
+    const canvas = this.canvas.terminal
+    return canvas?.info.id === id ? canvas : this.#sessions.get(id)
   }
 }

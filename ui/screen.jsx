@@ -20,6 +20,16 @@ export function TerminalScreen({ id }) {
     terminal.loadAddon(fit)
     terminal.open(node)
     terminal.textarea?.setAttribute('aria-label', 'Terminal input')
+    function recordDimensions() {
+      node.dataset.cols = terminal.cols
+      node.dataset.rows = terminal.rows
+    }
+    const geometry = terminal.onResize(recordDimensions)
+    recordDimensions()
+    function contextMenu(event) {
+      if (!event.shiftKey && terminal.modes.mouseTrackingMode !== 'none') event.preventDefault()
+    }
+    node.addEventListener('contextmenu', contextMenu)
     const path = sessionPath(id)
     let ready = false
     let retry
@@ -121,6 +131,8 @@ export function TerminalScreen({ id }) {
       clearTimeout(retry)
       clearTimeout(resizeTimer)
       observer.disconnect()
+      geometry.dispose()
+      node.removeEventListener('contextmenu', contextMenu)
       input.dispose()
       terminal.dispose()
     }

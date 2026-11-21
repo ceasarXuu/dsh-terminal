@@ -12,19 +12,34 @@ export class TerminalSession {
   #operations = Promise.resolve()
   #closed
   #drained
+  #mouseEncoding = 0
 
   constructor(info, handle, onExit) {
     this.info = info
     this.handle = handle
     this.#screen = new Terminal({ cols: info.cols, rows: info.rows, scrollback: SCROLLBACK, allowProposedApi: true })
     this.#screen.loadAddon(this.#serializer)
+    // The serializer restores mouse tracking but omits the SGR encoding.
+    for (const final of ['h', 'l']) {
+      this.#screen.parser.registerCsiHandler({ prefix: '?', final }, modes => {
+        for (const mode of modes) {
+          if (mode === 1006 || mode === 1016) {
+            if (final === 'h') this.#mouseEncoding = mode
+            else if (this.#mouseEncoding === mode) this.#mouseEncoding = 0
+          }
+        }
+        return false
+      })
+    }
+    this.#screen.parser.registerEscHandler({ final: 'c' }, () => { this.#mouseEncoding = 0; return false })
     this.#drained = this.#readOutput(onExit)
   }
 
   follow(feed) {
     return this.#enqueue(() => {
       if (this.#closed || feed.closed) return feed.close()
-      feed.send({ type: 'snapshot', screen: this.#serializer.serialize(), session: this.info })
+      const encoding = this.#mouseEncoding ? `\x1b[?${this.#mouseEncoding}h` : ''
+      feed.send({ type: 'snapshot', screen: this.#serializer.serialize() + encoding, session: this.info })
       if (feed.closed) return
       this.#viewers.add(feed)
       feed.onClose(() => this.#viewers.delete(feed))
