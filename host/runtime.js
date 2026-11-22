@@ -26,7 +26,7 @@ export class TerminalRuntime {
 
   get(id) {
     const session = this.#find(id)
-    if (!session) throw new TerminalError(404, 'This terminal was closed or is unavailable.')
+    if (!session) throw new TerminalError(404, 'This terminal was closed or is unavailable.', 'terminalUnavailable')
     return session
   }
 
@@ -56,7 +56,8 @@ export class TerminalRuntime {
       if (pending) return pending
     }
     if (this.#sessions.size + this.#allocations.size >= MAX_SESSIONS) {
-      throw new TerminalError(409, `Close a terminal before opening another. Up to ${MAX_SESSIONS} terminals can be open.`)
+      throw new TerminalError(409, `Close a terminal before opening another. Up to ${MAX_SESSIONS} terminals can be open.`,
+        'terminalLimit', { limit: MAX_SESSIONS })
     }
     const key = tmuxId ?? Symbol()
     const pending = this.#allocate(tmuxId).finally(() => this.#allocations.delete(key))
@@ -89,7 +90,7 @@ export class TerminalRuntime {
     if (tmuxId !== undefined) {
       const executable = await findTmux(this.subprocess, signal)
       const candidate = (await listTmux(executable, signal)).find(item => item.id === tmuxId)
-      if (!candidate) throw new TerminalError(404, 'The selected tmux session is no longer available.')
+      if (!candidate) throw new TerminalError(404, 'The selected tmux session is no longer available.', 'tmuxUnavailable')
       argv = [executable, 'attach-session', '-t', tmuxId]
       title = candidate.name
       if (process.env.TMUX_TMPDIR) env = { TMUX_TMPDIR: process.env.TMUX_TMPDIR }

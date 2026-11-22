@@ -7,7 +7,11 @@ export async function api(path, method = 'GET', body, signal) {
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const payload = await response.json().catch(() => null)
-  if (!response.ok || payload === null) throw new Error(payload?.error ?? 'Unable to connect to Terminal.')
+  if (!response.ok || payload === null) {
+    throw Object.assign(new Error(payload?.error ?? 'Unable to connect to Terminal.'), {
+      code: payload?.code, params: payload?.params,
+    })
+  }
   return payload
 }
 

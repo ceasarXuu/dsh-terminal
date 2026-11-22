@@ -27,6 +27,6 @@ export async function listTmux(executable, signal) {
     })
   } catch (error) {
     if (error.code === 1 && /no server running|connect(?:ing)? to .+No such file/iu.test(error.stderr ?? '')) return []
-    throw new TerminalError(503, 'Unable to list tmux sessions on this Mac.')
+    throw new TerminalError(503, 'Unable to list tmux sessions on this Mac.', 'tmuxListFailed')
   }
 }

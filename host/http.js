@@ -20,20 +20,20 @@ function reply(res, status, value) {
 
 async function readBody(req) {
   if (req.headers['content-type']?.split(';', 1)[0].trim() !== 'application/json') {
-    throw new TerminalError(415, 'Expected a JSON request.')
+    throw new TerminalError(415, 'Expected a JSON request.', 'invalidRequest')
   }
-  if (Number(req.headers['content-length']) > MAX_REQUEST_BYTES) throw new TerminalError(413, 'Request is too large.')
+  if (Number(req.headers['content-length']) > MAX_REQUEST_BYTES) throw new TerminalError(413, 'Request is too large.', 'invalidRequest')
   let size = 0
   const parts = []
   for await (const part of req.iterator({ destroyOnReturn: false })) {
     size += part.length
-    if (size > MAX_REQUEST_BYTES) throw new TerminalError(413, 'Request is too large.')
+    if (size > MAX_REQUEST_BYTES) throw new TerminalError(413, 'Request is too large.', 'invalidRequest')
     parts.push(part)
   }
   let body
   try { body = JSON.parse(Buffer.concat(parts).toString('utf8')) }
-  catch { throw new TerminalError(400, 'Invalid JSON request.') }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TerminalError(400, 'Expected a JSON object.')
+  catch { throw new TerminalError(400, 'Invalid JSON request.', 'invalidRequest') }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TerminalError(400, 'Expected a JSON object.', 'invalidRequest')
   return body
 }
 
@@ -77,9 +77,11 @@ export function terminalRoute(connection, runtime, logger) {
   return async (req, res) => {
     try {
       const admission = connection.admit(req)
-      if (admission.rejection !== undefined) return reply(res, admission.rejection, { error: 'DSH did not authorize this request.' })
+      if (admission.rejection !== undefined) {
+        return reply(res, admission.rejection, { error: 'DSH did not authorize this request.', code: 'unauthorized' })
+      }
       if (!LOOPBACK.test(req.headers.host ?? '') || !LOOPBACK_ADDRESS.test(req.socket.remoteAddress ?? '')) {
-        return reply(res, 403, { error: 'Terminal is available in the local DSH desktop interface.' })
+        return reply(res, 403, { error: 'Terminal is available in the local DSH desktop interface.', code: 'localOnly' })
       }
       const path = new URL(req.url, 'http://localhost').pathname.slice(BASE.length)
       const get = req.method === 'GET'
@@ -93,7 +95,7 @@ export function terminalRoute(connection, runtime, logger) {
       if (req.method === 'POST' && path === '/sessions') {
         const { tmuxId } = await readBody(req)
         if (tmuxId !== undefined && (typeof tmuxId !== 'string' || !/^\$\d{1,12}$/u.test(tmuxId))) {
-          throw new TerminalError(400, 'Invalid tmux session.')
+          throw new TerminalError(400, 'Invalid tmux session.', 'invalidRequest')
         }
         return reply(res, 200, await runtime.open({ tmuxId }))
       }
@@ -112,14 +114,14 @@ export function terminalRoute(connection, runtime, logger) {
           const body = await readBody(req)
           if (action === 'input') {
             if (typeof body.data !== 'string' || Buffer.byteLength(body.data) > MAX_INPUT_BYTES) {
-              throw new TerminalError(400, 'Invalid terminal input or paste larger than 64 KiB.')
+              throw new TerminalError(400, 'Invalid terminal input or paste larger than 64 KiB.', 'invalidInput')
             }
             await runtime.get(id).write(body.data)
             return reply(res, 200, {})
           }
           const { cols, rows } = body
           if (!Number.isInteger(cols) || cols < 2 || cols > 350 || !Number.isInteger(rows) || rows < 1 || rows > 150) {
-            throw new TerminalError(400, 'Invalid terminal dimensions.')
+            throw new TerminalError(400, 'Invalid terminal dimensions.', 'invalidRequest')
           }
           return reply(res, 200, { updated: await runtime.resize(id, cols, rows) })
         }
@@ -127,7 +129,9 @@ export function terminalRoute(connection, runtime, logger) {
       reply(res, 404, { error: 'Terminal endpoint not found.' })
     } catch (error) {
       if (res.headersSent) return res.destroy()
-      if (error instanceof TerminalError) return reply(res, error.status, { error: error.message })
+      if (error instanceof TerminalError) {
+        return reply(res, error.status, { error: error.message, code: error.code, params: error.params })
+      }
       logger.warn('Terminal operation failed: %s', error.message)
       reply(res, 500, { error: 'Unable to complete the terminal operation.' })
     }

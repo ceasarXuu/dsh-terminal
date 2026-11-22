@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { api, follow, sessionPath } from './api.js'
+import { translateError } from './locales.js'
 
-export function TerminalScreen({ id }) {
+export function TerminalScreen({ id, t }) {
   const element = useRef(null)
-  const [status, setStatus] = useState('Connecting…')
-  const [error, setError] = useState('')
+  const [status, setStatus] = useState({ key: 'connecting' })
+  const [error, setError] = useState(null)
+  const inputLabel = t('input')
 
   useEffect(() => {
     const node = element.current
@@ -19,7 +21,6 @@ export function TerminalScreen({ id }) {
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     terminal.open(node)
-    terminal.textarea?.setAttribute('aria-label', 'Terminal input')
     function recordDimensions() {
       node.dataset.cols = terminal.cols
       node.dataset.rows = terminal.rows
@@ -58,7 +59,7 @@ export function TerminalScreen({ id }) {
         requestedSize = key
         void api(`${path}/size`, 'POST', { cols, rows }, signal).catch(failure => {
           if (requestedSize === key) requestedSize = ''
-          if (!signal.aborted && ready) setError(failure.message)
+          if (!signal.aborted && ready) setError(failure)
         })
       }, 60)
     }
@@ -66,7 +67,7 @@ export function TerminalScreen({ id }) {
     const input = terminal.onData(data => {
       if (!ready) return
       if (pendingInput + data.length > 128 * 1024) {
-        setError('Terminal input is busy. Wait before pasting again.')
+        setError({ code: 'inputBusy' })
         return
       }
       const inputGeneration = generation
@@ -75,7 +76,7 @@ export function TerminalScreen({ id }) {
         if (!ready || signal.aborted || inputGeneration !== generation) return
         await api(`${path}/input`, 'POST', { data }, signal)
       }).catch(failure => {
-        if (!signal.aborted) setError(failure.message)
+        if (!signal.aborted) setError(failure)
       }).finally(() => { pendingInput -= data.length })
     })
     const observer = new ResizeObserver(requestSize)
@@ -100,14 +101,15 @@ export function TerminalScreen({ id }) {
             terminal.resize(session.cols, session.rows)
             await write(frame.screen)
             if (signal.aborted) return
-            setError('')
+            setError(null)
             requestedSize = ''
           } else {
             terminal.resize(session.cols, session.rows)
           }
           const running = session.state === 'running'
           setInputAllowed(running)
-          setStatus(running ? '' : session.exitCode == null ? 'Terminal disconnected' : `Exited (${session.exitCode})`)
+          setStatus(running ? null : session.exitCode == null ? { key: 'disconnected' }
+            : { key: 'exited', params: { code: session.exitCode } })
           if (frame.type === 'snapshot' && running) {
             terminal.focus()
             requestSize()
@@ -115,13 +117,13 @@ export function TerminalScreen({ id }) {
         })
         if (!signal.aborted) {
           setInputAllowed(false)
-          setStatus('Terminal closed')
+          setStatus({ key: 'closed' })
         }
       } catch {
         if (signal.aborted) return
         generation += 1
         setInputAllowed(false)
-        setStatus('Reconnecting…')
+        setStatus({ key: 'reconnecting' })
         retry = setTimeout(connect, 900)
       }
     }
@@ -138,9 +140,13 @@ export function TerminalScreen({ id }) {
     }
   }, [id])
 
+  useEffect(() => {
+    element.current?.querySelector('textarea')?.setAttribute('aria-label', inputLabel)
+  }, [id, inputLabel])
+
   return <div className="dsh-terminal-screen">
-    {status && <div role="status" className="dsh-terminal-status">{status}</div>}
+    {status && <div role="status" className="dsh-terminal-status">{t(status.key, status.params)}</div>}
     <div ref={element} className="dsh-terminal-viewport" />
-    {error && <div role="alert" className="dsh-terminal-alert">{error}</div>}
+    {error && <div role="alert" className="dsh-terminal-alert">{translateError(t, error)}</div>}
   </div>
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api, events, sessionPath } from './api.js'
 import { TmuxCanvasView, WINDOW_DRAG_TYPE } from './canvas.jsx'
+import { translateError } from './locales.js'
 import { TerminalScreen } from './screen.jsx'
 
 const POSITION = '@ceasarxuu/dsh-terminal:tabs'
@@ -23,12 +24,12 @@ function useSessions() {
   return { catalog, connected }
 }
 
-export function TerminalPanel() {
+export function TerminalPanel({ t }) {
   const { catalog, connected } = useSessions()
   const [selected, setSelected] = useState('')
   const [position, setPosition] = useState(() => localStorage.getItem(POSITION) === 'left' ? 'left' : 'top')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [picker, setPicker] = useState(null)
   const [starting, setStarting] = useState(false)
   const [dragSource, setDragSource] = useState(null)
@@ -46,9 +47,9 @@ export function TerminalPanel() {
 
   async function perform(action) {
     setBusy(true)
-    setError('')
+    setError(null)
     try { await action() }
-    catch (failure) { setError(failure.message) }
+    catch (failure) { setError(failure) }
     finally { setBusy(false) }
   }
 
@@ -113,42 +114,48 @@ export function TerminalPanel() {
     void perform(() => canvasAction('join', args))
   }
 
-  return <section className={`dsh-terminal-panel dsh-terminal-${position}`} aria-label="Terminal">
+  return <section className={`dsh-terminal-panel dsh-terminal-${position}`} aria-label={t('terminal')}>
     <header className="dsh-terminal-toolbar">
-      <h1>Terminal</h1>
+      <h1>{t('terminal')}</h1>
       <div className="dsh-terminal-actions">
-        <button type="button" disabled={busy || !connected} onClick={() => void open()}>New Terminal</button>
-        <button type="button" disabled={busy || !connected} aria-expanded={Boolean(picker)} onClick={togglePicker}>Connect tmux</button>
-        <button type="button" onClick={togglePosition}>{position === 'top' ? 'Tabs on Left' : 'Tabs on Top'}</button>
+        <button type="button" disabled={busy || !connected} onClick={() => void open()}>{t('newTerminal')}</button>
+        <button type="button" disabled={busy || !connected} aria-expanded={Boolean(picker)} onClick={togglePicker}>{t('connectTmux')}</button>
+        <button type="button" onClick={togglePosition}>{t(position === 'top' ? 'tabsOnLeft' : 'tabsOnTop')}</button>
         {current?.native && current.panes > 1 && <button type="button" disabled={busy || !connected}
-          title="Move the active tmux pane into a new window" onClick={() => void perform(() => canvasAction('break'))}>Break Pane</button>}
+          title={t('breakPaneHelp')} onClick={() => void perform(() => canvasAction('break'))}>{t('breakPane')}</button>}
       </div>
     </header>
-    {picker && <section className="dsh-terminal-picker" aria-label="tmux sessions">
-      {!picker.available ? <p>Install tmux on this Mac to connect existing sessions.</p>
-        : !picker.sessions.length ? <p>No running tmux sessions.</p>
+    {picker && <section className="dsh-terminal-picker" aria-label={t('tmuxSessions')}>
+      {!picker.available ? <p>{t('installTmux')}</p>
+        : !picker.sessions.length ? <p>{t('noTmuxSessions')}</p>
           : picker.sessions.map(session => <button type="button" key={session.id} disabled={busy} onClick={() => void open(session.id)}>{session.name}</button>)}
     </section>}
-    {error && <div className="dsh-terminal-notice" role="alert">{error}</div>}
-    {!connected && <div className="dsh-terminal-notice" role="status">{catalog ? 'Reconnecting to Terminal…' : 'Connecting to Terminal…'}</div>}
+    {error && <div className="dsh-terminal-notice" role="alert">{translateError(t, error)}</div>}
+    {!connected && <div className="dsh-terminal-notice" role="status">{t(catalog ? 'reconnecting' : 'connecting')}</div>}
     <div className="dsh-terminal-body">
-      {Boolean(entries.length) && <div className="dsh-terminal-tabs" ref={tabs} role="tablist" aria-label="Terminal tabs"
+      {Boolean(entries.length) && <div className="dsh-terminal-tabs" ref={tabs} role="tablist" aria-label={t('tabs')}
         aria-orientation={position === 'left' ? 'vertical' : 'horizontal'} onKeyDown={handleKeys}>
         {entries.map(entry => <div key={entry.id} className="dsh-terminal-tab" data-active={entry.id === current?.id}>
           <button type="button" role="tab" id={`terminal-tab-${entry.id}`} aria-selected={entry.id === current?.id}
             aria-controls={entry.id === current?.id ? 'dsh-terminal-current' : undefined} tabIndex={entry.id === current?.id ? 0 : -1}
             draggable={entry.native && connected && !busy} onDragStart={event => startDrag(event, entry.id)} onDragEnd={() => setDragSource(null)}
             title={entry.title} onClick={() => select(entry)}>
-            {entry.title}{entry.native ? (entry.panes > 1 ? ` · ${entry.panes} panes` : '') : (entry.state === 'running' ? '' : ' (exited)')}
+            {tabTitle(t, entry)}
           </button>
           <button type="button" className="dsh-terminal-close" disabled={!connected || busy}
-            aria-label={`${entry.tmuxId ? 'Detach' : 'Close'} ${entry.title}`} onClick={() => close(entry)}>×</button>
+            aria-label={t(entry.tmuxId ? 'detachTab' : 'closeTab', { title: entry.title })} onClick={() => close(entry)}>×</button>
         </div>)}
       </div>}
       {current ? <div role="tabpanel" className="dsh-terminal-content" id="dsh-terminal-current" aria-labelledby={`terminal-tab-${current.id}`}>
-        {current.native ? <TmuxCanvasView canvas={canvas} active={current} source={dragSource} onJoin={join}
-          onAttach={() => void perform(() => canvasAction('attach'))} /> : <TerminalScreen id={current.id} key={current.id} />}
-      </div> : <div className="dsh-terminal-empty">{starting ? 'Opening terminal…' : connected ? 'No open terminals' : ''}</div>}
+        {current.native ? <TmuxCanvasView t={t} canvas={canvas} active={current} source={dragSource} onJoin={join}
+          onAttach={() => void perform(() => canvasAction('attach'))} /> : <TerminalScreen t={t} id={current.id} key={current.id} />}
+      </div> : <div className="dsh-terminal-empty">{starting ? t('opening') : connected ? t('empty') : ''}</div>}
     </div>
   </section>
+}
+
+function tabTitle(t, entry) {
+  if (entry.native && entry.panes > 1) return t('panesTab', { title: entry.title, count: entry.panes })
+  if (!entry.native && entry.state !== 'running') return t('exitedTab', { title: entry.title })
+  return entry.title
 }

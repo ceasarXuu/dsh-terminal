@@ -51,7 +51,7 @@ export class TmuxCanvas {
 
   action(method, args) {
     return this.#enqueue(async () => {
-      if (!this.#executable) throw new TerminalError(409, 'Install tmux to use a terminal canvas.')
+      if (!this.#executable) throw new TerminalError(409, 'Install tmux to use a terminal canvas.', 'tmuxRequired')
       await this.#refresh()
       let windowId
       switch (method) {
@@ -72,7 +72,7 @@ export class TmuxCanvas {
           const active = this.#snapshot.windows.find(window => window.active)
           const flags = typeof args.side === 'string' && Object.hasOwn(DIRECTION, args.side) ? DIRECTION[args.side] : null
           if (!PANE.test(args.target ?? '') || !target || !active || source === active.id || !flags) {
-            throw new TerminalError(400, 'Choose a pane in a different tmux window.')
+            throw new TerminalError(400, 'Choose a pane in a different tmux window.', 'tmuxInvalidTarget')
           }
           await this.#command('join-pane', ...flags, '-s', source, '-t', target.id)
           windowId = active.id
@@ -80,12 +80,12 @@ export class TmuxCanvas {
         }
         case 'break': {
           const pane = this.#snapshot.panes.find(item => item.active)
-          if (!pane) throw new TerminalError(404, 'There is no active tmux pane.')
+          if (!pane) throw new TerminalError(404, 'There is no active tmux pane.', 'tmuxMissingPane')
           windowId = await this.#command('break-pane', '-P', '-F', '#{window_id}', '-s', pane.id, '-t', `${this.#sessionId}:`)
           break
         }
         case 'attach':
-          if (!this.#sessionId) throw new TerminalError(404, 'There is no tmux window to attach.')
+          if (!this.#sessionId) throw new TerminalError(404, 'There is no tmux window to attach.', 'tmuxMissingWindow')
           if (this.#terminal?.info.state === 'running') return {}
           await this.#closeClient()
           break
@@ -177,7 +177,7 @@ export class TmuxCanvas {
 
   #window(id) {
     if (typeof id !== 'string' || !WINDOW.test(id) || !this.#snapshot.windows.some(window => window.id === id)) {
-      throw new TerminalError(404, 'This tmux window is no longer available.')
+      throw new TerminalError(404, 'This tmux window is no longer available.', 'tmuxMissingWindow')
     }
     return id
   }
@@ -247,7 +247,8 @@ export class TmuxCanvas {
       })
       return stdout.trimEnd()
     } catch (error) {
-      throw new TerminalError(409, error.stderr?.trim() || 'tmux could not complete this operation.')
+      const detail = error.stderr?.trim() || 'tmux could not complete this operation.'
+      throw new TerminalError(409, detail, /no space for new pane/iu.test(detail) ? 'tmuxNoSpace' : 'tmuxFailed')
     }
   }
 }

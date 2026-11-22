@@ -78,7 +78,7 @@ export class TerminalSession {
 
   #useProcess(operation) {
     if (this.#closed || this.info.state !== 'running') {
-      throw new TerminalError(409, 'This terminal is no longer running.')
+      throw new TerminalError(409, 'This terminal is no longer running.', 'terminalStopped')
     }
     return operation()
   }
@@ -122,8 +122,10 @@ export class TerminalSession {
 }
 
 export class TerminalError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code = 'operationFailed', params) {
     super(message)
     this.status = status
+    this.code = code
+    this.params = params
   }
 }

@@ -39,12 +39,12 @@ function dropPreview(container, panes, topOffset, event) {
   }
 }
 
-export function TmuxCanvasView({ canvas, active, source, onJoin, onAttach }) {
+export function TmuxCanvasView({ t, canvas, active, source, onJoin, onAttach }) {
   const [preview, setPreview] = useState(null)
   const container = useRef(null)
   useEffect(() => { setPreview(null) }, [active.id, source])
   useEffect(() => {
-    container.current?.querySelector('textarea[aria-label="Terminal input"]')?.focus()
+    container.current?.querySelector('.dsh-terminal-viewport textarea')?.focus()
   }, [active.id])
 
   function plan(event) {
@@ -71,8 +71,8 @@ export function TmuxCanvasView({ canvas, active, source, onJoin, onAttach }) {
 
   return <div className="dsh-terminal-canvas" ref={container} onDragOver={hover} onDrop={drop}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget)) setPreview(null) }}>
-    {canvas.streamId && <TerminalScreen id={canvas.streamId} key={canvas.streamId} />}
-    {!canvas.attached && <button type="button" className="dsh-terminal-reattach" onClick={onAttach}>Attach tmux</button>}
+    {canvas.streamId && <TerminalScreen t={t} id={canvas.streamId} key={canvas.streamId} />}
+    {!canvas.attached && <button type="button" className="dsh-terminal-reattach" onClick={onAttach}>{t('reattachTmux')}</button>}
     {preview && <div className="dsh-terminal-drop-preview" style={preview.style} data-side={preview.side} aria-hidden="true" />}
   </div>
 }
