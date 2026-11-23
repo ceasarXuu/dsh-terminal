@@ -56,13 +56,10 @@ export function TerminalPanel({ t }) {
   async function open(tmuxId) {
     setStarting(true)
     await perform(async () => {
-      if (tmuxId === undefined && canvas?.available) {
-        await canvasAction('new')
-        setSelected('')
-      } else {
-        const session = await api('/sessions', 'POST', tmuxId === undefined ? {} : { tmuxId })
-        setSelected(session.id)
-      }
+      // A new terminal is always a plain shell: tmux stays opt-in, started by the
+      // person inside that shell. tmux windows that already exist still show up.
+      const session = await api('/sessions', 'POST', tmuxId === undefined ? {} : { tmuxId })
+      setSelected(session.id)
       setPicker(null)
     })
     setStarting(false)
