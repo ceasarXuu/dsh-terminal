@@ -9,7 +9,7 @@
     "url": "https://github.com/ceasarXuu/dsh-terminal.git"
   },
   "engines": {
-    "node": ">=24",
+    "node": "^24.22.3 || >=26.13.1",
     "dsh": ">=0.2.2-rc.5 <0.3.0-0"
   },
   "exports": {
