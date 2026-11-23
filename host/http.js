@@ -85,19 +85,11 @@ export function terminalRoute(connection, runtime, logger) {
       }
       const path = new URL(req.url, 'http://localhost').pathname.slice(BASE.length)
       const get = req.method === 'GET'
-      if (get && path === '/canvas') return reply(res, 200, runtime.canvas.snapshot)
-      if (req.method === 'POST' && path.startsWith('/canvas/')) {
-        return reply(res, 200, await runtime.canvas.action(path.slice('/canvas/'.length), await readBody(req)))
-      }
       if (get && path === '/sessions') return reply(res, 200, runtime.list())
       if (get && path === '/events') return runtime.follow(createFeed(res))
-      if (get && path === '/tmux') return reply(res, 200, await runtime.tmux())
       if (req.method === 'POST' && path === '/sessions') {
-        const { tmuxId } = await readBody(req)
-        if (tmuxId !== undefined && (typeof tmuxId !== 'string' || !/^\$\d{1,12}$/u.test(tmuxId))) {
-          throw new TerminalError(400, 'Invalid tmux session.', 'invalidRequest')
-        }
-        return reply(res, 200, await runtime.open({ tmuxId }))
+        await readBody(req)
+        return reply(res, 200, await runtime.open())
       }
       const match = SESSION_PATH.exec(path)
       if (match) {
