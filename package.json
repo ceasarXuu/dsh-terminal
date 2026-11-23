@@ -1,6 +1,6 @@
 {
   "name": "@ceasarxuu/dsh-terminal",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Standalone terminal tabs and tmux attachments for DeepSeek Harness Desktop",
   "type": "module",
   "license": "MIT",
@@ -10,7 +10,7 @@
   },
   "engines": {
     "node": "^24.22.3 || >=26.13.1",
-    "dsh": ">=0.2.2-rc.5 <0.3.0-0"
+    "dsh": ">=0.2.3-alpha.2 <0.3.0-0"
   },
   "exports": {
     ".": "./index.js",

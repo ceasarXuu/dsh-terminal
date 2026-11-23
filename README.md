@@ -4,10 +4,10 @@ DeepSeek Harness Desktop 的独立终端插件。在左栏 **Maid** 下方选择
 
 ## 安装
 
-适用于 macOS 上的 DSH Desktop `0.2.2-rc.5` 或兼容的后续 `0.2.x` 版本。用 DSH Desktop 自带的 CLI 从 [GitHub Release](https://github.com/ceasarXuu/dsh-terminal/releases/latest) 安装到 `desktop` profile。
+适用于 macOS 上的 DSH Desktop `0.2.3-alpha.2` 或兼容的后续 `0.2.x` 版本。用 DSH Desktop 自带的 CLI 从 [GitHub Release](https://github.com/ceasarXuu/dsh-terminal/releases/latest) 安装到 `desktop` profile。
 
 ```sh
-dsh plugin --profile desktop add https://github.com/ceasarXuu/dsh-terminal/releases/download/v0.2.1/ceasarxuu-dsh-terminal-0.2.1.tgz --save-exact --ignore-scripts
+dsh plugin --profile desktop add https://github.com/ceasarXuu/dsh-terminal/releases/download/v0.2.2/ceasarxuu-dsh-terminal-0.2.2.tgz --save-exact --ignore-scripts
 ```
 
 如果终端里的 `dsh --version` 指向旧版，可以使用 `/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh` 执行同一个命令。若已运行的 Desktop 未显示入口，在桌面任务结束后正常重启 DSH。
